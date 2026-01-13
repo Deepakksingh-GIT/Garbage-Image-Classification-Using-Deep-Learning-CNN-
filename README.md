@@ -3,7 +3,7 @@
 
 # ♻️ RecycleVision – Garbage Image Classification Using Deep Learning
 
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/e3fa3610-3668-4665-aba6-53239ba24d74" />
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/89f55ac0-c6c2-441d-8783-edf85b906004" />
 <img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/b069a615-4e77-48d4-ab17-5903d02cc9ad" />
 
 ## 📌 Project Overview
