@@ -113,3 +113,4 @@ st.markdown(
     "<p style='text-align: center; color: gray;'>Built with ❤️ using CNN & Streamlit</p>",
     unsafe_allow_html=True
 )
+
