@@ -7,7 +7,7 @@ import pandas as pd
 import altair as alt
 
 
-# Page Config
+# ---------------- PAGE CONFIG ---------------- #
 
 st.set_page_config(
     page_title="RecycleVision",
@@ -15,19 +15,27 @@ st.set_page_config(
     layout="wide"
 )
 
-# Load Model
+
+# ---------------- LOAD MODEL ---------------- #
 
 @st.cache_resource
 def load_model():
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    model_path = os.path.join(base_dir, "recyclevision_model.h5")
+    # Model must be in same directory as app.py
+    model_path = "recyclevision_model.h5"
+
+    if not os.path.exists(model_path):
+        st.error("Model file not found. Please check the file path.")
+        st.stop()
+
     return tf.keras.models.load_model(model_path)
+
 
 model = load_model()
 
 class_names = ['cardboard', 'glass', 'metal', 'paper', 'plastic', 'organic']
 
-# Header
+
+# ---------------- HEADER ---------------- #
 
 st.markdown(
     """
@@ -41,14 +49,17 @@ st.markdown(
 
 st.divider()
 
-# Layout
+
+# ---------------- LAYOUT ---------------- #
 
 col1, col2 = st.columns([1, 1])
 
-# Upload Section
+
+# ---------------- UPLOAD SECTION ---------------- #
 
 with col1:
     st.subheader("📤 Upload Garbage Image")
+
     uploaded_file = st.file_uploader(
         "Supported formats: JPG, JPEG, PNG",
         type=["jpg", "jpeg", "png"]
@@ -58,14 +69,16 @@ with col1:
         image = Image.open(uploaded_file).convert("RGB")
         st.image(image, caption="Uploaded Image", use_container_width=True)
 
-# Prediction Section
+
+# ---------------- PREDICTION SECTION ---------------- #
 
 with col2:
     st.subheader("📊 Prediction Result")
 
     if uploaded_file and st.button("🔍 Predict Waste Type"):
         with st.spinner("Analyzing image..."):
-            # Preprocess
+
+            # Preprocess image
             img = image.resize((224, 224))
             img_array = np.array(img) / 255.0
             img_array = np.expand_dims(img_array, axis=0)
@@ -74,14 +87,14 @@ with col2:
             prediction = model.predict(img_array)
             predicted_index = np.argmax(prediction)
             predicted_class = class_names[predicted_index]
-            confidence = prediction[0][predicted_index] * 100
+            confidence = float(prediction[0][predicted_index] * 100)
 
-        # Result card
+        # Show Result
         st.success(f"🗑️ **Predicted Category:** {predicted_class.upper()}")
         st.progress(int(confidence))
         st.write(f"**Confidence:** {confidence:.2f}%")
 
-        # Probability chart
+        # Probability Chart
         prob_df = pd.DataFrame({
             "Category": class_names,
             "Probability (%)": prediction[0] * 100
@@ -90,27 +103,26 @@ with col2:
         st.subheader("📈 Class Probability Distribution (%)")
 
         chart = alt.Chart(prob_df).mark_bar().encode(
-        x=alt.X("Category", sort=None),
-        y=alt.Y("Probability (%)", scale=alt.Scale(domain=[0, 100])),
-        tooltip=["Category", "Probability (%)"]
+            x=alt.X("Category", sort=None),
+            y=alt.Y("Probability (%)", scale=alt.Scale(domain=[0, 100])),
+            tooltip=["Category", "Probability (%)"]
         )
 
         text = chart.mark_text(
-        align='center',
-        baseline='bottom',
-        dy=-5
+            align='center',
+            baseline='bottom',
+            dy=-5
         ).encode(
-        text=alt.Text("Probability (%):Q", format=".2f")
+            text=alt.Text("Probability (%):Q", format=".2f")
         )
 
         st.altair_chart(chart + text, use_container_width=True)
 
 
-# Footer
+# ---------------- FOOTER ---------------- #
 
 st.divider()
 st.markdown(
     "<p style='text-align: center; color: gray;'>Built with ❤️ using CNN & Streamlit</p>",
     unsafe_allow_html=True
 )
-
