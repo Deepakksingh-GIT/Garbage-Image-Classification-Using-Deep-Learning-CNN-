@@ -1,128 +1,49 @@
-import os
-import numpy as np
 import streamlit as st
-import tensorflow as tf
 from PIL import Image
-import pandas as pd
-import altair as alt
+import numpy as np
+import tensorflow as tf
 
-
-# ---------------- PAGE CONFIG ---------------- #
-
-st.set_page_config(
-    page_title="RecycleVision",
-    page_icon="♻️",
-    layout="wide"
-)
-
-
-# ---------------- LOAD MODEL ---------------- #
+# Model path and image size settings
+MODEL_PATH = 'models/garbage_classifier.h5'
+IMAGE_SIZE = (224, 224)
 
 @st.cache_resource
 def load_model():
-    # Model must be in same directory as app.py
-    model_path = "recyclevision_model.h5"
+    """Load trained model once and cache it for fast repeated inference."""
+    return tf.keras.models.load_model(MODEL_PATH)
 
-    if not os.path.exists(model_path):
-        st.error("Model file not found. Please check the file path.")
-        st.stop()
+@st.cache_data
+def get_class_labels():
+    # Update this list if class order differs.
+    return ['cardboard', 'glass', 'metal', 'paper', 'plastic', 'organic']
 
-    return tf.keras.models.load_model(model_path)
+def preprocess_image(image: Image.Image):
+    """Resize + normalize image to model input format."""
+    img = image.convert('RGB').resize(IMAGE_SIZE)
+    arr = np.array(img) / 255.0
+    return np.expand_dims(arr, axis=0)
 
+# Streamlit UI
+st.title('RecycleVision - Garbage Image Classification')
+st.write('Upload a waste image and get predicted category + top-3 scores.')
 
-model = load_model()
+uploaded_file = st.file_uploader('Upload an image', type=['jpg', 'jpeg', 'png'])
+if uploaded_file is not None:
+    img = Image.open(uploaded_file)
+    st.image(img, caption='Uploaded image', use_column_width=True)
 
-class_names = ['cardboard', 'glass', 'metal', 'paper', 'plastic', 'organic']
+    model = load_model()
+    classes = get_class_labels()
 
+    x = preprocess_image(img)
+    preds = model.predict(x)[0]
 
-# ---------------- HEADER ---------------- #
+    top3 = np.argsort(preds)[::-1][:3]
 
-st.markdown(
-    """
-    <h1 style='text-align: center;'>♻️ RecycleVision</h1>
-    <h4 style='text-align: center; color: gray;'>
-    Garbage Image Classification using Deep Learning
-    </h4>
-    """,
-    unsafe_allow_html=True
-)
+    st.subheader('Predictions')
+    for i, idx in enumerate(top3, 1):
+        st.write(f"{i}. {classes[idx]}: {preds[idx]*100:.2f}%")
 
-st.divider()
-
-
-# ---------------- LAYOUT ---------------- #
-
-col1, col2 = st.columns([1, 1])
-
-
-# ---------------- UPLOAD SECTION ---------------- #
-
-with col1:
-    st.subheader("📤 Upload Garbage Image")
-
-    uploaded_file = st.file_uploader(
-        "Supported formats: JPG, JPEG, PNG",
-        type=["jpg", "jpeg", "png"]
-    )
-
-    if uploaded_file:
-        image = Image.open(uploaded_file).convert("RGB")
-        st.image(image, caption="Uploaded Image", use_container_width=True)
-
-
-# ---------------- PREDICTION SECTION ---------------- #
-
-with col2:
-    st.subheader("📊 Prediction Result")
-
-    if uploaded_file and st.button("🔍 Predict Waste Type"):
-        with st.spinner("Analyzing image..."):
-
-            # Preprocess image
-            img = image.resize((224, 224))
-            img_array = np.array(img) / 255.0
-            img_array = np.expand_dims(img_array, axis=0)
-
-            # Predict
-            prediction = model.predict(img_array)
-            predicted_index = np.argmax(prediction)
-            predicted_class = class_names[predicted_index]
-            confidence = float(prediction[0][predicted_index] * 100)
-
-        # Show Result
-        st.success(f"🗑️ **Predicted Category:** {predicted_class.upper()}")
-        st.progress(int(confidence))
-        st.write(f"**Confidence:** {confidence:.2f}%")
-
-        # Probability Chart
-        prob_df = pd.DataFrame({
-            "Category": class_names,
-            "Probability (%)": prediction[0] * 100
-        })
-
-        st.subheader("📈 Class Probability Distribution (%)")
-
-        chart = alt.Chart(prob_df).mark_bar().encode(
-            x=alt.X("Category", sort=None),
-            y=alt.Y("Probability (%)", scale=alt.Scale(domain=[0, 100])),
-            tooltip=["Category", "Probability (%)"]
-        )
-
-        text = chart.mark_text(
-            align='center',
-            baseline='bottom',
-            dy=-5
-        ).encode(
-            text=alt.Text("Probability (%):Q", format=".2f")
-        )
-
-        st.altair_chart(chart + text, use_container_width=True)
-
-
-# ---------------- FOOTER ---------------- #
-
-st.divider()
-st.markdown(
-    "<p style='text-align: center; color: gray;'>Built with ❤️ using CNN & Streamlit</p>",
-    unsafe_allow_html=True
-)
+    st.write('---')
+    st.write('Raw probabilities:')
+    st.json({classes[i]: float(preds[i]) for i in range(len(classes))})
